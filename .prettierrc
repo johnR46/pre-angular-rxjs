@@ -1,0 +1,7 @@
+{
+  "singleQuote": true,
+
+  "[typescript]": {
+    "editor.formatOnSave": true
+  }
+}
