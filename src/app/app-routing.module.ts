@@ -6,6 +6,10 @@ const routes: Routes = [
     path: '',
     loadChildren: () =>
       import('./todo-rxjs/todo-rxjs.module').then(m => m.TodoRxjsModule)
+  },
+  {
+    path: '**',
+    redirectTo: ''
   }
 ];
 

@@ -2,18 +2,25 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { TodoRxjsRoutingModule } from './todo-rxjs-routing.module';
-import { CreationComponent } from './containers/creation.component';
-import { CombinationComponent } from './containers/combination.component';
-import { FilteringComponent } from './containers/filtering.component';
-import { TransformationComponent } from './containers/transformation.component';
-import { UtilityComponent } from './containers/utility.component';
+import { CreationComponent } from './containers/todo-rxjs.component';
 
+import { FlexLayoutModule } from '@angular/flex-layout';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 
 @NgModule({
-  declarations: [CreationComponent, CombinationComponent, FilteringComponent, TransformationComponent, UtilityComponent],
+  declarations: [CreationComponent],
   imports: [
     CommonModule,
-    TodoRxjsRoutingModule
+    TodoRxjsRoutingModule,
+    FlexLayoutModule,
+    // material
+    MatFormFieldModule,
+    MatInputModule,
+    MatIconModule,
+    MatButtonModule
   ]
 })
-export class TodoRxjsModule { }
+export class TodoRxjsModule {}
