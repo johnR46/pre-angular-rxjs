@@ -13,7 +13,9 @@ import {
   range,
   timer,
   combineLatest,
-  zip
+  zip,
+  pairs,
+  throwError
 } from 'rxjs';
 import {
   map,
@@ -27,9 +29,12 @@ import {
   mergeAll,
   switchAll,
   concatAll,
-  exhaust,
   switchMap,
-  delay
+  delay,
+  exhaustMap,
+  toArray,
+  catchError,
+  retry
 } from 'rxjs/operators';
 // อันไหนใช้ใน pipe  ให้  import  มาจาก rxjs/operators return type operators function
 // อันไหนจะ get ค่าออกมาเฉยๆ เนี่ย หรือจะยัดเข้า เอามาจาก  rxjs ( return type data)
@@ -60,52 +65,89 @@ interface CustomForZip {
       <div fxLayout="row" fxFlex>
         <div fxFlex="20">
           <div fxFlex="50">
-            <div>
-              <button mat-raised-button (click)="usingNext()">next</button>
-            </div>
-            <div>
-              <button mat-raised-button (click)="usingFrom()">from</button>
-            </div>
-            <div><button mat-raised-button (click)="usingOf()">of</button></div>
-            <div>
-              <button mat-raised-button (click)="usingRange()">Range</button>
-            </div>
-            <div>
-              <button
-                mat-raised-button
-                #forFormEvent
-                (click)="usingFormEvent()"
-              >
-                fromEvent
-              </button>
-            </div>
-            <div>
-              <button mat-raised-button (click)="usingFormInterval()">
-                interval
-              </button>
+            <div fxLayout="row">
+              <div>
+                <button mat-raised-button (click)="usingNext()">next</button>
+              </div>
+              <h5 style="margin:9px 0px 3px 10px">
+                next : {{ makeForNext$ | async }}
+              </h5>
             </div>
 
-            <div>
-              <button mat-raised-button (click)="usingForTimer()">
-                Timer
-              </button>
+            <div fxLayout="row">
+              <div>
+                <button mat-raised-button (click)="usingFrom()">from</button>
+              </div>
+              <h5 style="margin:9px 0px 3px 10px">
+                from :{{ makeForFrom$ | async }}
+              </h5>
             </div>
 
-            <div>
-              <button mat-raised-button (click)="usingForGenerate()">
-                generated
-              </button>
+            <div fxLayout="row">
+              <div>
+                <button mat-raised-button (click)="usingOf()">of</button>
+              </div>
+              <h5 style="margin:9px 0px 3px 10px">
+                of :{{ makeForOf$ | async }}
+              </h5>
             </div>
-          </div>
-          <div fxFlex="50">
-            <h5>next : {{ makeForNext$ | async }}</h5>
-            <h5>from :{{ makeForFrom$ | async }}</h5>
-            <h5>of :{{ makeForOf$ | async }}</h5>
-            <h5>range :{{ makeForRange$ | async }}</h5>
-            <h5>fromEvent:{{ makeForFormEvent$ | async | json }}</h5>
-            <h5>Interval:{{ makeForInterval$ | async }}</h5>
-            <h5>Timer :{{ makeForTimer$ | async }}</h5>
-            <h5>generated :{{ makeForGenerate$ | async }}</h5>
+
+            <div fxLayout="row">
+              <div>
+                <button mat-raised-button (click)="usingRange()">Range</button>
+              </div>
+              <h5 style="margin:9px 0px 3px 10px">
+                range :{{ makeForRange$ | async }}
+              </h5>
+            </div>
+
+            <div fxLayout="row">
+              <div>
+                <button
+                  mat-raised-button
+                  #forFormEvent
+                  (click)="usingFormEvent()"
+                >
+                  fromEvent
+                </button>
+              </div>
+              <h5 style="margin:9px 0px 3px 10px">
+                fromEvent:{{ makeForFormEvent$ | async | json }}
+              </h5>
+            </div>
+
+            <div fxLayout="row">
+              <div>
+                <button mat-raised-button (click)="usingFormInterval()">
+                  interval
+                </button>
+              </div>
+              <h5 style="margin:9px 0px 3px 10px">
+                Interval:{{ makeForInterval$ | async }}
+              </h5>
+            </div>
+
+            <div fxLayout="row">
+              <div>
+                <button mat-raised-button (click)="usingForTimer()">
+                  Timer
+                </button>
+              </div>
+              <h5 style="margin:9px 0px 3px 10px">
+                Timer :{{ makeForTimer$ | async }}
+              </h5>
+            </div>
+
+            <div fxLayout="row">
+              <div>
+                <button mat-raised-button (click)="usingForGenerate()">
+                  generated
+                </button>
+              </div>
+              <h5 style="margin:9px 0px 3px 10px">
+                generated :{{ makeForGenerate$ | async }}
+              </h5>
+            </div>
           </div>
         </div>
         <div fxFlex="20">
@@ -227,19 +269,20 @@ export class CreationComponent implements OnInit {
   makeForNext$: Observable<number>;
   makeForFrom$: Observable<number>;
   makeForOf$: Observable<number>;
+  makeForPair$: Observable<any>;
   makeForRange$: Observable<number>;
   makeForFormEvent$: Observable<any>;
   makeForInterval$: Observable<number>;
   makeForTimer$: Observable<number>;
   makeForGenerate$: Observable<number>;
 
-  // for Combination (รวมของ)
+  // for Combination (รวมแล้วปล่อยออกมาใหม่)
   price: FormControl = new FormControl(0);
   qty: FormControl = new FormControl(0);
   amount: FormControl = new FormControl(0);
-  makeForConcat$: Observable<number>; // รอลำดับการทำงาน ก่อน หลัง ( แล้วรวมเป็นกันเป็น 1 ผลลัพธ์ )
-  makeForforkJoin$: Observable<any[]>;
-  makeForMerge$: Observable<number | number | number>;
+  makeForConcat$: Observable<number>; // รอลำดับการทำงาน ก่อน หลัง ( แล้วรวมเป็นกันเป็น 1 Observable )
+  makeForforkJoin$: Observable<any[]>; // รวมกันแล้วจับผลลัพธ์เรียงกันเป็นอาเรย์
+  makeForMerge$: Observable<number | number | number>; //
   makeForZip$: Observable<CustomForZip>;
 
   // Filtering     filter , take, takeUntil
@@ -251,18 +294,18 @@ export class CreationComponent implements OnInit {
   // operator ที่มีความสามารถของ Mapping และ Flattening รวมกัน  concatMap , mergeMap, switchMap
   // Flattening เดียวๆ  concatAll() , mergeAll(), switchAll() , exhaust()
 
-  // switchMap (map + switchAll) : “Fashion” Operator ?
-
   makeForMap$: Observable<number>;
+
   makeForConcatMap$: Observable<number>;
 
-  playerObservable = of('Miracle', 'Topson');
+  // switchMap (map + switchAll) : “Fashion” Operator ? ของใหม่มาไปใหม่เลย ไม่สนอันเดิม
+  makeForSwitchMap$: Observable<number>;
 
-  http = {
-    getMessage(name): Observable<string> {
-      return of(`${name} is Awesome`, `${name} is cool!`);
-    }
-  };
+  // Utility Operators
+  // tap delay toArray
+
+  // Handle Errors in RXJS
+  // catchError  retry retryWhen
 
   constructor(private api: ApiService) {}
 
@@ -270,35 +313,206 @@ export class CreationComponent implements OnInit {
     this.amount.disable();
     this.UsingCombineLatest();
 
-    this.playerObservable
+    // this.usingConcatMap();
+    // this.usingMergeMap();
+    // this.usingExhaustMap();
+
+    // this.UsingConCatAll();
+    // this.UsingSwitchAll();
+    // this.UsingMergeAll();
+    // this.usingPair();
+    // this.usingTap();
+    // this.usingDelay();
+    // this.usingToArray();
+
+    // this.usingCatchErrorAndRetryFnCb();
+    // this.usingCatchErrorAndThrowErr();
+    this.usingRetry();
+  }
+
+  usingRetry(): void {
+    const source = interval(1000);
+    const example = source
       .pipe(
-        map(name => this.http.getMessage('john')),
-        // concatAll()
-        exhaust()
-        // mergeAll(),
-        // switchAll()
+        mergeMap(val => {
+          if (val > 5) {
+            return throwError(`Error !`);
+          }
+          return of(val);
+        }),
+        retry(2) // ถ้าพัง (errจะลองใหม่ 2 รอบ  ไม่ผ่านอีกก็ยัด ThrowErr)
       )
+      .subscribe(
+        v => console.log(` using wih ThrowError : ${v}`),
+        err => console.log(`error to observable : ${err}`)
+      );
+  }
+
+  // โยน throw ออกมาข้างนอกเมื่อ  Observable ส่งข้อผิดพลาด
+  usingCatchErrorAndThrowErr(): void {
+    of(1, 2, 3, 4, 5)
+      .pipe(
+        map(n => {
+          if (n === 4) {
+            throw ' four';
+          }
+          return n;
+        }),
+        catchError(err => {
+          throw `error is source . Detail : ${err}`;
+        })
+      )
+      .subscribe(
+        v => console.log(`value : ${v}`),
+        err => console.log(err)
+      );
+  }
+
+  usingCatchErrorAndRetryFnCb(): void {
+    of(1, 2, 3, 4, 5)
+      .pipe(
+        map(n => {
+          if (n === 4) {
+            throw ' four';
+          }
+          return n;
+        }),
+        catchError((err, cb) => cb),
+        take(30)
+      )
+      .subscribe(v => console.log(`for catchError : ${v}`)); // retry ?
+    // Continues with a different Observable when there's an error
+    // ทำ Observable ไป ถ้าเจอ  error ให้ออกแล้วมาทำตรง catchError ต่อ มีการโยน cb เข้าไป เรียกใหม่
+  }
+
+  usingCatchError(): void {
+    of(1, 2, 3, 4, 5)
+      .pipe(
+        map(n => {
+          if (n === 4) {
+            throw ' four';
+          }
+          return n;
+        }),
+        // catchError((err, caight) => caight),
+        // take(30)
+        catchError(err => of('I', 'II', 'IV', 'V'))
+      )
+      .subscribe(v => console.log(`for catchError : ${v}`)); // retry ?
+    // Continues with a different Observable when there's an error
+    // ทำ Observable ไป ถ้าเจอ  error ให้ออกแล้วมาทำตรง catchError ต่อ
+  }
+
+  usingToArray(): void {
+    range(1, 100)
+      .pipe(delay(3000), toArray()) // จับผลลัพธ์ยัดลง array ทั้งหมด แล้วโยนตู้มมาเป็น arr ชุดเดียว
+      .subscribe(v =>
+        console.log(`length of observable : ${v.length} and  value : ${v}`)
+      );
+  }
+
+  usingDelay(): void {
+    of(50)
+      .pipe(delay(5000)) // หน่วงเวลาก่อนปล่อยค่าออกไป มีผลครั้งแรกเท่านั้น ( )
+      .subscribe(v => console.log(`using with delay : ${v}`));
+  }
+
+  usingTap(): void {
+    of(1, 2, 3, 4, 5, 6)
+      .pipe(tap(v => console.log('using tab' + v + 5))) // จะเห็นว่าแก้ค่าไปไงก็ได้ ไม่กระทบ value จริง เหมือนไว้ log เฉยๆ อะ
       .subscribe(console.log);
   }
 
-  usingConCatMap(): void {
-    const req = timer(1000, 1000)
-      .pipe(
-        map(v => v),
-        concatMap(v => of('A' + v))
-      )
-      .subscribe(v => console.log(v));
+  // Mapping และ Flattening
+  usingExhaustMap(): void {
+    const one = of('1 second http request').pipe(delay(1000));
+    const two = of('2 second http request').pipe(delay(2000));
+    const tree = of('3 second http request').pipe(delay(3000));
+    const four = of('4 second http request').pipe(delay(4000));
+    const five = of('5 second http request').pipe(delay(5000));
+    const result = from([one, two, tree, two, five])
+      .pipe(exhaustMap(x => x))
+      .subscribe(v => console.log('exhaustMap : ', v));
   }
-
+  // Mapping และ Flattening
+  usingMergeMap(): void {
+    const one = of('1 second http request').pipe(delay(1000));
+    const two = of('2 second http request').pipe(delay(2000));
+    const tree = of('3 second http request').pipe(delay(3000));
+    const four = of('4 second http request').pipe(delay(4000));
+    const five = of('5 second http request').pipe(delay(5000));
+    const result = from([one, two, tree, four, five])
+      .pipe(mergeMap(x => x))
+      .subscribe(v => console.log('usingMergeMap :', v));
+  }
+  // Mapping และ Flattening
   usingSwitchMap(): void {
-    const req = timer(1000, 1000)
-      .pipe(
-        map(v => v),
-        switchMap(v => of('A' + v))
-      )
-      .subscribe(v => console.log(v));
+    const one = of('1 second http request').pipe(delay(1000));
+    const two = of('2 second http request').pipe(delay(2000));
+    const tree = of('3 second http request').pipe(delay(3000));
+    const four = of('4 second http request').pipe(delay(4000));
+    const five = of('5 second http request').pipe(delay(5000));
+    const makeForSwitchMap$ = from([one, two, tree, four, five])
+      .pipe(switchMap(x => x))
+      .subscribe(v => console.log(' usingSwitchMap :', v));
+  }
+  // Mapping และ Flattening
+  usingConCatMap(): void {
+    const one = of('1 second http request').pipe(delay(1000));
+    const two = of('2 second http request').pipe(delay(2000));
+    const tree = of('3 second http request').pipe(delay(3000));
+    const four = of('4 second http request').pipe(delay(4000));
+    const five = of('5 second http request').pipe(delay(5000));
+
+    const makeForConcatMap$ = from([one, two, tree, four, five])
+      .pipe(concatMap(x => x))
+      .subscribe(v => console.log(' usingConCatMap :', v));
   }
 
+  // only Flattening
+  UsingConCatAll() {
+    const one = of('1 second http request').pipe(delay(1000));
+    const two = of('2 second http request').pipe(delay(2000));
+    const tree = of('3 second http request').pipe(delay(3000));
+    const four = of('4 second http request').pipe(delay(4000));
+    const five = of('5 second http request').pipe(delay(5000));
+    const makeForConcatMap$ = from([one, two, tree, four, five])
+      .pipe(
+        map(v => v),
+        concatAll() // แปลง observable เป็น value ( sub value ให้แล้วเอามาต่อกัน เท่านั้นละ  )
+      )
+      .subscribe(v => console.log('concatAll :', v));
+  }
+
+  UsingMergeAll() {
+    const one = of('1 second http request').pipe(delay(1000));
+    const two = of('2 second http request').pipe(delay(2000));
+    const tree = of('3 second http request').pipe(delay(3000));
+    const four = of('4 second http request').pipe(delay(4000));
+    const five = of('5 second http request').pipe(delay(5000));
+    const makeForConcatMap$ = from([five, four, tree, two, one])
+      .pipe(
+        map(v => v),
+        mergeAll() // ใครมาก่อนออกก่อน ( เอามารวมกันหมดแล้วปล่อยเป็นทางเดียว )
+      )
+      .subscribe(v => console.log('mergeAll :', v));
+  }
+
+  UsingSwitchAll() {
+    const one = of('1 second http request').pipe(delay(1000));
+    const two = of('2 second http request').pipe(delay(2000));
+    const tree = of('3 second http request').pipe(delay(3000));
+    const four = of('4 second http request').pipe(delay(4000));
+    const five = of('5 second http request').pipe(delay(5000));
+    const makeForConcatMap$ = from([two, tree, five, one, four])
+      .pipe(
+        map(v => v),
+        switchAll() // สนแค่ output ตัวสุดท้าย ไม่ว่าจะมาก่อนหลัง
+      )
+      .subscribe(v => console.log('switchAll :', v));
+  }
+
+  // Mapping
   usingMap(): void {
     // ไม่ต่างอะไรกับการ map arr  ไม่มีมีการ  sub ค่าก่อนหน้ามาใช้เหมือนกับ concatMap() แค่นั้นแหละ ถถถ
     // การเปลี่ยนแปลง collection ของชุดข้อมูลให้เป็นชุดข้อมูลที่มีขนาดเท่าเดิมแต่เป็นชุดข้อมูลใหม่
@@ -306,6 +520,7 @@ export class CreationComponent implements OnInit {
     this.makeForMap$ = source.pipe(map(v => v));
   }
 
+  // Mapping & Flattening
   usingConcatMap(): void {
     // Mapping และ Flattening (subค่าละเอาไปใช้ต่อ)
     // เอาผลลัพํธ์ออกมาจากอันแรกแล้วทำต่อจากนั้นรับ val กลับมา
@@ -319,16 +534,19 @@ export class CreationComponent implements OnInit {
   }
 
   usingTakeUntil(): void {
-    // ปล่อยของไปเรื่อยจนกว่าจะมีการแจ้งเตือนเข้ามาค่อยหยุดพูด
+    // ปล่อยของไปเรื่อยจนกว่าจะมีการแจ้งเตือนเข้ามาค่อยหยุดปล่อยของ
     const source = interval(1000);
     const trick = timer(5000).pipe(take(1));
     this.makeFortakeUntil$ = source.pipe(takeUntil(trick));
   }
+
+  // flat
   usingTake(): void {
     // เอากี่ครั้ง  ในนี้คือเอา 10 ครั้ง แล้ว unsub
     this.makeForTake$ = interval(1000).pipe(take(10));
   }
 
+  // filter
   usingFilter(): void {
     this.makeForFilter$ = of(1, 3, 5, 7, 9, 6).pipe(
       filter(v => v % 2 === 0), // กรองอันที่เป็นเลขคี่ออก
@@ -426,7 +644,7 @@ export class CreationComponent implements OnInit {
             sub.next(1), sub.complete();
           },
           1000,
-          setInterval(() => sub.next(4), 1000)
+          setTimeout(() => sub.next(4), 1000)
         );
     });
   }
@@ -437,6 +655,20 @@ export class CreationComponent implements OnInit {
 
   usingOf(): void {
     this.makeForOf$ = of(1); //  ทำงานครั้งเดียว ( เรียก   . next  แล้ว  complete ต่อเลย )
+  }
+
+  usingPair(): void {
+    const data: CustomForZip = {
+      age: 20,
+      isDev: false,
+      name: 'hello pair'
+    };
+
+    this.makeForPair$ = pairs<CustomForZip>(data);
+
+    this.makeForPair$.subscribe(v => {
+      console.log(v);
+    });
   }
 
   usingRange(): void {
