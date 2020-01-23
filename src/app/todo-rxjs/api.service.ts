@@ -1,20 +1,32 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { map, catchError } from 'rxjs/operators';
+import { Book } from '../core/types/book';
+import { Author } from '../core/types/author';
+import { AppErrorHandler } from '../core/handlerror/app-error-handler.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
-  private baseUrl = 'https://jsonplaceholder.typicode.com/posts';
-  private baseUrl2 = 'https://jsonplaceholder.typicode.com/users';
+  private baseUrl = 'http://localhost:3000';
+
   constructor(private http: HttpClient) {}
 
-  getPostById(id: number): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/${id}`);
+  getBookAll(): Observable<Book[]> {
+    return this.http.get<Book[]>(`${this.baseUrl}/books`);
   }
-  getUserById(id: number): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl2}/${id}`);
+
+  getBookById(id: number): Observable<Book> {
+    return this.http.get<Book>(`${this.baseUrl}/books/${id}`);
+  }
+
+  getAuthorAll(): Observable<Author[]> {
+    return this.http.get<Author[]>(`${this.baseUrl}/authors`);
+  }
+
+  getAuthorById(id: number): Observable<Author> {
+    return this.http.get<Author>(`${this.baseUrl}/authors/${id}`);
   }
 }

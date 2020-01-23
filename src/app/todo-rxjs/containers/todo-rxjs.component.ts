@@ -39,6 +39,7 @@ import {
 // อันไหนใช้ใน pipe  ให้  import  มาจาก rxjs/operators return type operators function
 // อันไหนจะ get ค่าออกมาเฉยๆ เนี่ย หรือจะยัดเข้า เอามาจาก  rxjs ( return type data)
 import { ApiService } from '../api.service';
+import { error } from 'util';
 
 interface CustomForZip {
   age: number;
@@ -327,6 +328,20 @@ export class CreationComponent implements OnInit {
 
     // this.usingCatchErrorAndRetryFnCb();
     // this.usingCatchErrorAndThrowErr();
+
+    this.api
+      .getAuthorAll()
+      .pipe(tap(console.log))
+      .subscribe(
+        () => {},
+        () => {
+          console.log(error);
+        },
+        () => {
+          console.log('success');
+        }
+      );
+
     this.usingRetry();
   }
 
